@@ -1,0 +1,63 @@
+name: Import human symbol gene sets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/import-human-symbol-genesets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import and verify GMT files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p human/symbol
+          base_url="https://data.broadinstitute.org/gsea-msigdb/msigdb/release/2026.1.Hs"
+          for f in \
+            c2.cgp.v2026.1.Hs.symbols.gmt \
+            c2.cp.kegg_medicus.v2026.1.Hs.symbols.gmt \
+            c2.cp.kegg.v2026.1.Hs.symbols.gmt \
+            c2.cp.reactome.v2026.1.Hs.symbols.gmt \
+            c2.cp.wikipathways.v2026.1.Hs.symbols.gmt \
+            c5.go.bp.v2026.1.Hs.symbols.gmt \
+            c5.go.cc.v2026.1.Hs.symbols.gmt \
+            c5.go.mf.v2026.1.Hs.symbols.gmt \
+            h.all.v2026.1.Hs.symbols.gmt; do
+            curl -fL --retry 4 --retry-delay 2 "$base_url/$f" -o "human/symbol/$f"
+          done
+          cat .import/payload.part0{0..5} | base64 -d > /tmp/custom.tar.gz
+          tar -xzf /tmp/custom.tar.gz -C human/symbol
+          cat > /tmp/genesets.sha256 <<'EOF_SHA'
+          0a3a63e541f994426e9040933b462600b6877cb7ae3c6af4af02f1f49c68e882  human/symbol/aging.Hs.symbols.gmt
+          170609526c4a52d89f3ce3719b616b199b3b13d8785dc672a593fabb90e72bf2  human/symbol/c2.cgp.v2026.1.Hs.symbols.gmt
+          e257052d604cb2f386f8372b3fb9b494095688ac8ae0d72ba947cc00f5628cb1  human/symbol/c2.cp.kegg_medicus.v2026.1.Hs.symbols.gmt
+          032221e23e9b71c6767a34b460fcbfc73fe33bdd19603f919f98806f56297373  human/symbol/c2.cp.kegg.v2026.1.Hs.symbols.gmt
+          5d61f289a2400cddfbb3a3353829fd2284a360bbe50f2093b566c4b7bea93341  human/symbol/c2.cp.reactome.v2026.1.Hs.symbols.gmt
+          42c7a6dedea6a7abbc37f5d77d1ab84cc8fdaad44d7f664026047d23cc78f52c  human/symbol/c2.cp.wikipathways.v2026.1.Hs.symbols.gmt
+          9be09dd06d6652566eb52eed530d62e6dfecc4365c1e81afd6f0b7f2e86dd4f9  human/symbol/c5.go.bp.v2026.1.Hs.symbols.gmt
+          1ee846c446a87c1b6cc2b097dc415bed1c2f6b539312d2611f946038c5f7e9f8  human/symbol/c5.go.cc.v2026.1.Hs.symbols.gmt
+          72da03f5438f1005566ecd5c85bf32e81f343910241948da603d2fafdf47f555  human/symbol/c5.go.mf.v2026.1.Hs.symbols.gmt
+          30dafb8099f4df992edd4e64858f1450ed2ead84ea438572e259a5e07d1ce171  human/symbol/customized.genesets.Hs.symbols.gmt
+          eecaf6dad908334ae885406ec72bdc0646d8917588ed7c219fac92fc5363f596  human/symbol/h.all.v2026.1.Hs.symbols.gmt
+          10b895ced519f7d5fbf36755a86cd5dfd9a915bad1763d1c1f6c9f082abbc40f  human/symbol/self.neural_sig.Hs.symbols.gmt
+          e99da9a8ccc7b1e8c9d3a97b38210470fde345ca81fd2fcf80c4a0938ce52a28  human/symbol/signature_metabolism.Hs.symbols.gmt
+          d555ed50637d79aeabad0389503e2fd8a5c5c5290f151e878c8e1df2e24290db  human/symbol/signature_tme.Hs.symbols.gmt
+          d1eb0fe99d679b75f81a7103e639c18acbdfb82f4bf26d1a97263615a0726a71  human/symbol/signature_tumor.Hs.symbols.gmt
+          EOF_SHA
+          sha256sum -c /tmp/genesets.sha256
+          rm -f human/symbol/.gitkeep
+          rm -rf .import
+          rm -f .github/workflows/import-human-symbol-genesets.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --stat
+          git commit -m "Add human symbol gene sets"
+          git push
