@@ -23,7 +23,6 @@ jobs:
           for f in \
             c2.cgp.v2026.1.Hs.symbols.gmt \
             c2.cp.kegg_medicus.v2026.1.Hs.symbols.gmt \
-            c2.cp.kegg.v2026.1.Hs.symbols.gmt \
             c2.cp.reactome.v2026.1.Hs.symbols.gmt \
             c2.cp.wikipathways.v2026.1.Hs.symbols.gmt \
             c5.go.bp.v2026.1.Hs.symbols.gmt \
@@ -32,8 +31,15 @@ jobs:
             h.all.v2026.1.Hs.symbols.gmt; do
             curl -fL --retry 4 --retry-delay 2 "$base_url/$f" -o "human/symbol/$f"
           done
+
+          # Restore the six user-uploaded custom GMT files byte-for-byte.
           cat .import/payload.part0{0..5} | base64 -d > /tmp/custom.tar.gz
           tar -xzf /tmp/custom.tar.gz -C human/symbol
+
+          # Restore the user-uploaded KEGG GMT file byte-for-byte.
+          base64 -d .import/kegg.payload.b64 | gzip -dc > human/symbol/c2.cp.kegg.v2026.1.Hs.symbols.gmt
+
+          # Every resulting file must exactly match the SHA-256 of the files uploaded in this chat.
           cat > /tmp/genesets.sha256 <<'EOF_SHA'
           0a3a63e541f994426e9040933b462600b6877cb7ae3c6af4af02f1f49c68e882  human/symbol/aging.Hs.symbols.gmt
           170609526c4a52d89f3ce3719b616b199b3b13d8785dc672a593fabb90e72bf2  human/symbol/c2.cgp.v2026.1.Hs.symbols.gmt
@@ -52,9 +58,12 @@ jobs:
           d1eb0fe99d679b75f81a7103e639c18acbdfb82f4bf26d1a97263615a0726a71  human/symbol/signature_tumor.Hs.symbols.gmt
           EOF_SHA
           sha256sum -c /tmp/genesets.sha256
+
+          test "$(find human/symbol -maxdepth 1 -type f -name '*.gmt' | wc -l)" -eq 15
           rm -f human/symbol/.gitkeep
           rm -rf .import
           rm -f .github/workflows/import-human-symbol-genesets.yml
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
