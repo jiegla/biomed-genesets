@@ -14,12 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Import and verify GMT files
+      - name: Import uploaded GMT files
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p human/symbol
           base_url="https://data.broadinstitute.org/gsea-msigdb/msigdb/release/2026.1.Hs"
+
+          # These MSigDB files are downloaded only as a transport mechanism.
+          # Their SHA-256 must exactly match the files uploaded in this chat.
           for f in \
             c2.cgp.v2026.1.Hs.symbols.gmt \
             c2.cp.kegg_medicus.v2026.1.Hs.symbols.gmt \
@@ -32,14 +35,15 @@ jobs:
             curl -fL --retry 4 --retry-delay 2 "$base_url/$f" -o "human/symbol/$f"
           done
 
-          # Restore the six user-uploaded custom GMT files byte-for-byte.
+          # Restore uploaded custom files byte-for-byte from staged payloads.
           cat .import/payload.part0{0..5} | base64 -d > /tmp/custom.tar.gz
           tar -xzf /tmp/custom.tar.gz -C human/symbol
 
-          # Restore the user-uploaded KEGG GMT file byte-for-byte.
+          # Restore uploaded aging and KEGG files byte-for-byte.
+          base64 -d .import/aging.Hs.symbols.gmt.gz.b64 | gzip -dc > human/symbol/aging.Hs.symbols.gmt
           base64 -d .import/kegg.payload.b64 | gzip -dc > human/symbol/c2.cp.kegg.v2026.1.Hs.symbols.gmt
 
-          # Every resulting file must exactly match the SHA-256 of the files uploaded in this chat.
+          # Verify every final file is byte-identical to the uploaded originals.
           cat > /tmp/genesets.sha256 <<'EOF_SHA'
           0a3a63e541f994426e9040933b462600b6877cb7ae3c6af4af02f1f49c68e882  human/symbol/aging.Hs.symbols.gmt
           170609526c4a52d89f3ce3719b616b199b3b13d8785dc672a593fabb90e72bf2  human/symbol/c2.cgp.v2026.1.Hs.symbols.gmt
@@ -67,6 +71,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --stat
-          git commit -m "Add human symbol gene sets"
+          git commit -m "Add uploaded human symbol gene sets"
           git push
